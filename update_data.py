@@ -1,32 +1,34 @@
 import requests
+import re
 from datetime import datetime
 
 def fetch_data():
-   # Questo è il link "motore" di Sisal, molto più stabile della pagina web
-   url = "https://www.superenalotto.it/api-m/estrazioni/ultima"
-   headers = {
-       'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
-   }
+   # Sito di notizie ufficiale sui giochi, molto stabile e senza blocchi 404
+   url = "https://www.agipronews.it/flash-news/superenalotto-estrazione-ultima"
+   headers = {'User-Agent': 'Mozilla/5.0'}
 
    try:
        response = requests.get(url, headers=headers, timeout=20)
        if response.status_code == 200:
-           data_json = response.json()
-           estrazione = data_json['estrazione']
+           testo = response.text
 
-           # TRASFORMAZIONE DATA: da 20260505 a 05-mag
-           data_raw = estrazione['dataEstrazione'] # "20260505"
-           dt = datetime.strptime(data_raw, '%Y%m%d')
-           mesi = ["gen", "feb", "mar", "apr", "mag", "giu", "lug", "ago", "set", "ott", "nov", "dic"]
-           data_custom = f"{dt.day:02d}-{mesi[dt.month - 1]}"
+           # 1. Cerchiamo la sestina (cerca gruppi di numeri separati da spazi o trattini)
+           # Cerchiamo la combinazione vincente nel testo
+           numeri = re.findall(r'\b([1-9]|[1-8][0-9]|90)\b', testo)
 
-           # PRENDIAMO I NUMERI (proprio quelli della tua foto!)
-           combinazione = estrazione['combinazione'] # [24, 34, 45, 55, 81, 87]
-           jolly = estrazione['jolly']               # 23
+           # Di solito i primi 6 sono la combinazione, il 7° è il Jolly
+           if len(numeri) >= 7:
+               sestina = numeri[0:6]
+               jolly = numeri[6]
 
-           return f"{data_custom};{';'.join(map(str, combinazione))};{jolly}"
+               # 2. Gestione Data: prendiamo la data di oggi nel tuo formato
+               dt = datetime.now()
+               mesi = ["gen", "feb", "mar", "apr", "mag", "giu", "lug", "ago", "set", "ott", "nov", "dic"]
+               data_custom = f"{dt.day:02d}-{mesi[dt.month - 1]}"
+
+               return f"{data_custom};{';'.join(sestina)};{jolly}"
    except Exception as e:
-       print(f"Errore: {e}")
+       print(f"Errore durante il recupero: {e}")
    return None
 
 def update_csv():
@@ -37,12 +39,15 @@ def update_csv():
        with open(file_path, 'r') as f:
            content = f.read()
 
-       if nuova_riga.split(';')[0] in content:
-           print("Estrazione già presente.")
-       else:
+       # Se la data non c'è, scriviamo
+       if nuova_riga.split(';')[0] not in content:
            with open(file_path, 'a') as f:
                f.write('\n' + nuova_riga)
-           print(f"Successo! Aggiunta riga: {nuova_riga}")
+           print(f"Aggiornato con successo: {nuova_riga}")
+       else:
+           print("Estrazione già presente.")
 
 if __name__ == "__main__":
    update_csv()
+
+Inviato da iPhone
