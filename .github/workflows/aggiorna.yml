@@ -1,48 +1,42 @@
-import requests
-from bs4 import BeautifulSoup
-import os
+name: Auto Update Superenalotto
 
-def update_csv():
-   file_path = 'storico_completo.csv'
-   # URL di FrankNet (molto semplice da scansionare)
-   url = "https://www.franknet.altervista.org/superena/2026.HTM"
-   headers = {'User-Agent': 'Mozilla/5.0'}
+on:
+ workflow_dispatch: # Ti permette di lanciarlo a mano premendo il tasto
+ schedule:
+   - cron: '0 21 * * *' # Gira automaticamente ogni sera alle 21:00
 
-   try:
-       response = requests.get(url, headers=headers, timeout=20)
-       response.encoding = 'utf-8'
-       soup = BeautifulSoup(response.text, 'html.parser')
-       rows = soup.find_all('tr')
+jobs:
+ build:
+   runs-on: ubuntu-latest
 
-       # 1. Prendiamo l'ULTIMA riga dal sito
-       for row in reversed(rows):
-           cols = row.find_all('td')
-           if len(cols) >= 9:
-               data_sito = cols[0].text.strip().replace(" ", "-")
-               numeri = [cols[i].text.strip() for i in range(1, 7)]
-               jolly = cols[7].text.strip()
-               superstar = cols[8].text.strip()
-               nuova_estrazione = f"{data_sito};{';'.join(numeri)};{jolly};{superstar}"
-               break
+   # Permessi necessari per permettere all'Action di salvare il file nel tuo repository
+   permissions:
+     contents: write
 
-       # 2. Leggiamo l'ULTIMA riga del tuo file
-       if os.path.exists(file_path):
-           with open(file_path, 'r') as f:
-               linee = [l.strip() for l in f.readlines() if l.strip()]
-               ultima_riga_file = linee[-1] if linee else ""
-       else:
-           ultima_riga_file = ""
+   steps:
+     - name: Checkout repository
+       uses: actions/checkout@v3
 
-       # 3. CONFRONTO DIRETTO: Aggiunge solo se l'ultima riga è diversa
-       if nuova_estrazione != ultima_riga_file:
-           with open(file_path, 'a') as f:
-               f.write('\n' + nuova_estrazione)
-           print(f"AGGIORNATO: {nuova_estrazione}")
-       else:
-           print("Nessuna nuova estrazione rispetto all'ultima salvata.")
+     - name: Set up Python
+       uses: actions/setup-python@v4
+       with:
+         python-version: '3.x'
 
-   except Exception as e:
-       print(f"Errore: {e}")
+     # Questo è il pezzo che mancava: installa i "motori" per lo script
+     - name: Install dependencies
+       run: |
+         python -m pip install --upgrade pip
+         pip install requests beautifulsoup4
 
-if __name__ == "__main__":
-   update_csv()
+     # Lancia lo script Python che scansiona FrankNet
+     - name: Run update script
+       run: python update_data.py
+
+     # Prende il file CSV modificato e lo carica definitivamente su GitHub
+     - name: Commit and push changes
+       run: |
+         git config --global user.name "GitHub Action"
+         git config --global user.email "action@github.com"
+         git add storico_completo.csv
+         git commit -m "Aggiornamento automatico estrazione" || exit 0
+         git push origin main
