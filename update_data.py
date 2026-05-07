@@ -3,7 +3,7 @@ import re
 
 def fetch_adm_data():
    # URL che punta alla pagina dell'Agenzia Dogane e Monopoli
-   url = "https://www.adm.gov.it/portale/gioco-del-superenalotto-estrazioni"
+   url = "https://https://www.adm.gov.it/portale/en/monopoli/giochi/giochi_num_total/superenalotto?p_p_id=it_sogei_wda_web_portlet_WebDisplayAamsPortlet&p_p_lifecycle=2&p_p_state=normal&p_p_mode=view&p_p_cacheability=cacheLevelPage"
    headers = {
        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
    }
