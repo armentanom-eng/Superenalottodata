@@ -4,7 +4,6 @@ import os
 
 def update_csv():
    file_path = 'storico_completo.csv'
-   # URL di FrankNet (molto semplice da scansionare)
    url = "https://www.franknet.altervista.org/superena/2026.HTM"
    headers = {'User-Agent': 'Mozilla/5.0'}
 
@@ -14,7 +13,8 @@ def update_csv():
        soup = BeautifulSoup(response.text, 'html.parser')
        rows = soup.find_all('tr')
 
-       # 1. Prendiamo l'ULTIMA riga dal sito
+       last_site_row = ""
+       # 1. Recupero l'ultima riga dal sito
        for row in reversed(rows):
            cols = row.find_all('td')
            if len(cols) >= 9:
@@ -22,10 +22,15 @@ def update_csv():
                numeri = [cols[i].text.strip() for i in range(1, 7)]
                jolly = cols[7].text.strip()
                superstar = cols[8].text.strip()
-               nuova_estrazione = f"{data_sito};{';'.join(numeri)};{jolly};{superstar}"
+               # Definiamo la variabile correttamente
+               last_site_row = f"{data_sito};{';'.join(numeri)};{jolly};{superstar}"
                break
 
-       # 2. Leggiamo l'ULTIMA riga del tuo file
+       if not last_site_row:
+           print("Non ho trovato dati sul sito.")
+           return
+
+       # 2. Leggo l'ultima riga dal file
        if os.path.exists(file_path):
            with open(file_path, 'r') as f:
                linee = [l.strip() for l in f.readlines() if l.strip()]
@@ -33,16 +38,17 @@ def update_csv():
        else:
            ultima_riga_file = ""
 
-       # 3. CONFRONTO DIRETTO: Aggiunge solo se l'ultima riga è diversa
-       if nuova_estrazione != ultima_riga_file:
+       # 3. Confronto e aggiunta
+       if last_site_row != ultima_riga_file:
            with open(file_path, 'a') as f:
-               f.write('\n' + nuova_estrazione)
-           print(f"AGGIORNATO: {nuova_estrazione}")
+               # Scriviamo la riga
+               f.write('\n' + last_site_row)
+           print(f"AGGIORNATO: {last_site_row}")
        else:
-           print("Nessuna nuova estrazione rispetto all'ultima salvata.")
+           print("Nessun nuovo aggiornamento necessario.")
 
    except Exception as e:
-       print(f"Errore: {e}")
+       print(f"Errore durante l'esecuzione: {e}")
 
 if __name__ == "__main__":
    update_csv()
