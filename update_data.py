@@ -2,29 +2,31 @@ import requests
 from datetime import datetime
 
 def fetch_data():
+   # Questo è il link "motore" di Sisal, molto più stabile della pagina web
+   url = "https://www.superenalotto.it/api-m/estrazioni/ultima"
+   headers = {
+       'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
+   }
+
    try:
-       # Sorgente dati affidabile
-       url = "https://www.estrazionidellotto.it/api/estrazioni-superenalotto"
-       headers = {'User-Agent': 'Mozilla/5.0'}
-       response = requests.get(url, headers=headers, timeout=15)
-
+       response = requests.get(url, headers=headers, timeout=20)
        if response.status_code == 200:
-           ultima = response.json()[0] 
+           data_json = response.json()
+           estrazione = data_json['estrazione']
 
-           # FORMATTAZIONE DATA: da 2026-05-05 a 05-mag
-           data_dt = datetime.strptime(ultima['data'], '%Y-%m-%d')
+           # TRASFORMAZIONE DATA: da 20260505 a 05-mag
+           data_raw = estrazione['dataEstrazione'] # "20260505"
+           dt = datetime.strptime(data_raw, '%Y%m%d')
            mesi = ["gen", "feb", "mar", "apr", "mag", "giu", "lug", "ago", "set", "ott", "nov", "dic"]
-           data_custom = f"{data_dt.day:02d}-{mesi[data_dt.month - 1]}"
+           data_custom = f"{dt.day:02d}-{mesi[dt.month - 1]}"
 
-           numeri = ultima['combinazione'] # I 6 numeri della sestina
-           jolly = ultima['jolly']         # Il numero Jolly
+           # PRENDIAMO I NUMERI (proprio quelli della tua foto!)
+           combinazione = estrazione['combinazione'] # [24, 34, 45, 55, 81, 87]
+           jolly = estrazione['jolly']               # 23
 
-           # Creiamo la riga: Data;N1;N2;N3;N4;N5;N6;Jolly
-           # In totale 8 elementi separati da punto e virgola
-           nuova_riga = f"{data_custom};{';'.join(map(str, numeri))};{jolly}"
-           return nuova_riga
+           return f"{data_custom};{';'.join(map(str, combinazione))};{jolly}"
    except Exception as e:
-       print(f"Errore durante il recupero: {e}")
+       print(f"Errore: {e}")
    return None
 
 def update_csv():
@@ -33,16 +35,14 @@ def update_csv():
 
    if nuova_riga:
        with open(file_path, 'r') as f:
-           lines = f.readlines()
-           # Controlliamo se l'ultima riga del file ha già la stessa data
-           if lines and nuova_riga.split(';')[0] in lines[-1]:
-               print(f"L'estrazione del {nuova_riga.split(';')[0]} è già presente.")
-               return
+           content = f.read()
 
-       # Aggiungiamo la riga in fondo al file
-       with open(file_path, 'a') as f:
-           f.write('\n' + nuova_riga)
-       print(f"Successo! Aggiunta riga: {nuova_riga}")
+       if nuova_riga.split(';')[0] in content:
+           print("Estrazione già presente.")
+       else:
+           with open(file_path, 'a') as f:
+               f.write('\n' + nuova_riga)
+           print(f"Successo! Aggiunta riga: {nuova_riga}")
 
 if __name__ == "__main__":
    update_csv()
