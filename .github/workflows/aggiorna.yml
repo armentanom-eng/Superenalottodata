@@ -1,18 +1,20 @@
 name: Auto Update Superenalotto
 
 on:
- workflow_dispatch: # Questo ti permette di premere "Run workflow" a mano
+ workflow_dispatch:
 
 jobs:
  build:
    runs-on: ubuntu-latest
-   # Questa sezione dà il permesso fisico di SCRIVERE sul tuo repository
+   # QUESTA PARTE È FONDAMENTALE PER SCRIVERE SUL CSV
    permissions:
      contents: write
 
    steps:
      - name: Checkout repository
        uses: actions/checkout@v3
+       with:
+         token: ${{ secrets.GITHUB_TOKEN }}
 
      - name: Set up Python
        uses: actions/setup-python@v4
@@ -24,9 +26,8 @@ jobs:
 
      - name: Commit and push changes
        run: |
-         git config --global user.name "github-actions[bot]"
-         git config --global user.email "github-actions[bot]@users.noreply.github.com"
+         git config --global user.name "GitHub Action"
+         git config --global user.email "action@github.com"
          git add storico_completo.csv
-         # Se non ci sono modifiche, non dà errore (|| echo...)
-         git commit -m "Aggiornamento estrazione 05-mag" || echo "Nessuna modifica"
+         git commit -m "Aggiunto 05-mag" || exit 0
          git push
