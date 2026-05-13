@@ -3,7 +3,7 @@ name: Auto Update Superenalotto
 on:
  workflow_dispatch: # Ti permette di lanciarlo a mano premendo il tasto
  schedule:
-   - cron: '0 7 * * *' # Gira automaticamente ogni sera alle 21:00
+   - cron: '0 7 * * *' # Gira automaticamente ogni sera alle 9:00
 
 jobs:
  build:
