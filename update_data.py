@@ -5,66 +5,66 @@ from datetime import datetime
 
 def update_csv():
     file_path = 'storico_completo.csv'
-    # Usiamo un endpoint che non blocca GitHub
-    url = "https://www.superenalotto.it/api-vincite/v1/estrazioni/ultima"
-    
-    # Header molto specifici per "ingannare" il firewall di Sisal
+    # Estrazioni.org è molto stabile e bot-friendly
+    url = "https://www.estrazioni.org/superenalotto/"
     headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'application/json, text/plain, */*',
-        'Origin': 'https://www.superenalotto.it',
-        'Referer': 'https://www.superenalotto.it/ultima-estrazione'
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
     }
 
     try:
-        # Usiamo una sessione per mantenere i cookie (importante per Sisal)
-        session = requests.Session()
-        response = session.get(url, headers=headers, timeout=20)
+        r = requests.get(url, headers=headers, timeout=20)
+        r.encoding = 'utf-8'
+        html = r.text
+
+        # 1. Recupero della data (es. 12/05/2026)
+        data_match = re.search(r'(\d{2})/(\d{2})/(\d{4})', html)
+        if not data_match:
+            print("Data non trovata.")
+            return
         
-        if response.status_code != 200:
-            print(f"Sisal ancora bloccato (Errore {response.status_code}). Provo metodo alternativo...")
-            # Se Sisal blocca ancora, torniamo a una scansione testuale ignorando i blocchi
-            r_alt = session.get("https://www.superenalotto.net/", headers=headers, timeout=20)
-            testo = r_alt.text
-            # Cerchiamo i numeri nell'HTML (Metodo d'emergenza)
-            numeri = re.findall(r'<span class="ball">(\d+)</span>', testo)
-            data_match = re.search(r'Estrazione di (\w+) (\d+) (\w+) (\d+)', testo)
-            # ... logica di emergenza qui ...
+        gg, mm, aaaa = data_match.groups()
+        mesi_it = {"01":"gen","02":"feb","03":"mar","04":"apr","05":"mag","06":"giu","07":"lug","08":"ago","09":"set","10":"ott","11":"nov","12":"dic"}
+        data_formattata = f"{gg}-{mesi_it[mm]}"
+
+        # 2. Recupero dei numeri (sestina + jolly + superstar)
+        # Cerchiamo i cerchietti dei numeri che solitamente hanno una classe specifica
+        numeri = re.findall(r'<span class="ball(?:_jolly|_star)?">(\d{1,2})</span>', html)
+        
+        if len(numeri) < 8:
+            # Secondo tentativo con una regex più generica se la classe cambia
+            numeri = re.findall(r'>(\d{1,2})</span>', html)[:8]
+
+        if len(numeri) < 7:
+            print("Numeri non rilevati correttamente.")
             return
 
-        data = response.json()
-        
-        # Trasformazione Data (es. 2026-05-12 -> 12-mag)
-        dt_obj = datetime.strptime(data['dataEstrazione'][:10], '%Y-%m-%d')
-        mesi = ["gen","feb","mar","apr","mag","giu","lug","ago","set","ott","nov","dic"]
-        data_csv = f"{dt_obj.day:02d}-{mesi[dt_obj.month-1]}"
+        # Formattazione: 6 numeri sestina + jolly + superstar (se presente)
+        sestina = ";".join([n.zfill(2) for n in numeri[:6]])
+        jolly = numeri[6].zfill(2)
+        superstar = numeri[7].zfill(2) if len(numeri) >= 8 else "00"
 
-        # Estrazione numeri (formato 02, 05, etc.)
-        sestina = ";".join([str(n).zfill(2) for n in data['combinazione']])
-        jolly = str(data['jolly']).zfill(2)
-        superstar = str(data['superstar']).zfill(2)
+        nuova_estrazione = f"{data_formattata};{sestina};{jolly};{superstar}"
 
-        nuova_estrazione = f"{data_csv};{sestina};{jolly};{superstar}"
-
-        # Lettura file e Indice
+        # 3. Confronto con il CSV locale
         if not os.path.exists(file_path): return
-
+        
         with open(file_path, 'r', encoding='utf-8') as f:
             righe = [l.strip() for l in f.readlines() if l.strip()]
             ultima_riga = righe[-1]
 
-        if nuova_estrazione not in ultima_riga:
-            indice = int(ultima_riga.split(';')[-1]) + 1
-            riga_finale = f"{nuova_estrazione};{indice}"
+        if data_formattata not in ultima_riga:
+            # Calcolo nuovo indice progressivo
+            nuovo_indice = int(ultima_riga.split(';')[-1]) + 1
+            riga_finale = f"{nuova_estrazione};{nuovo_indice}"
             
             with open(file_path, 'a', encoding='utf-8') as f:
                 f.write('\n' + riga_finale)
-            print(f"✅ AGGIORNATO: {riga_finale}")
+            print(f"✅ AGGIORNATO DA ESTRAZIONI.ORG: {riga_finale}")
         else:
-            print("Già presente.")
+            print(f"L'estrazione del {data_formattata} è già presente.")
 
     except Exception as e:
-        print(f"Errore: {e}")
+        print(f"Errore durante il recupero: {e}")
 
 if __name__ == "__main__":
     update_csv()
