@@ -18,40 +18,46 @@ def update_csv():
         data_match = re.search(r'(\d{1,2})\s+(maggio|giugno|luglio|agosto|settembre|ottobre|novembre|dicembre|gennaio|febbraio|marzo|aprile)', html, re.IGNORECASE)
         if not data_match: return
         
-        data_csv = f"{data_match.group(1).zfill(2)}-{data_match.group(2).lower()[:3]}"
+        gg = data_match.group(1).zfill(2)
+        mese_nome = data_match.group(2).lower()[:3] 
+        data_csv = f"{gg}-{mese_nome}"
 
-        # 2. TROVA TUTTI I NUMERI (Sestina + Jolly + Star)
-        # Cerchiamo qualsiasi numero contenuto tra <li> e </li> che abbia "ball" nel tag
+        # 2. Trova TUTTI i numeri (ne cerchiamo 8 in totale)
+        # La regex ora dice: prendi il numero dentro qualsiasi tag <li> che abbia la parola "ball" nella classe
         tutti_i_numeri = re.findall(r'<li [^>]*ball[^>]*>(\d{1,2})</li>', html)
 
         if len(tutti_i_numeri) >= 8:
-            # Prendiamo i primi 8 in ordine: 0,1,2,3,4,5 (sestina), 6 (jolly), 7 (star)
-            numeri_puliti = [str(int(n)) for n in tutti_i_numeri] # Toglie lo zero davanti se presente
+            # Prendiamo i primi 8 in ordine cronologico di apparizione sulla pagina
+            numeri_puliti = [n.zfill(2) for n in tutti_i_numeri[:8]]
             
-            sestina = ";".join(numeri_puliti[:6])
-            jolly = numeri_puliti[6]
-            star = numeri_puliti[7]
+            sestina = ";".join(numeri_puliti[:6]) # I primi 6
+            jolly = numeri_puliti[6]             # Il 7°
+            star = numeri_puliti[7]              # L'8°
 
-            stringa_estrazione = f"{data_csv};{sestina};{jolly};{star}"
+            nuova_riga_dati = f"{data_csv};{sestina};{jolly};{star}"
 
-            # 3. Scrittura nel CSV con Indice all'inizio
+            # 3. Gestione CSV e Indice Progressivo (all'inizio)
             if not os.path.exists(file_path): return
+
             with open(file_path, 'r', encoding='utf-8') as f:
                 righe = [l.strip() for l in f.readlines() if l.strip()]
                 ultima_riga = righe[-1]
 
             if data_csv not in ultima_riga:
+                # Estraiamo l'indice (il primo numero della riga)
                 ultimo_indice = int(ultima_riga.split()[0])
                 nuovo_indice = ultimo_indice + 1
                 
-                # Formato identico a riga 4280: INDICE [SPAZI] DATI
-                riga_finale = f"{nuovo_indice}   {stringa_estrazione}"
+                # Formato: INDICE + 3 SPAZI + DATI
+                riga_finale = f"{nuovo_indice}   {nuova_riga_dati}"
                 
                 with open(file_path, 'a', encoding='utf-8') as f:
                     f.write('\n' + riga_finale)
                 print(f"✅ AGGIORNATO: {riga_finale}")
+            else:
+                print(f"Estrazione del {data_csv} già presente.")
         else:
-            print(f"Trovati solo {len(tutti_i_numeri)} numeri. Struttura incompleta.")
+            print(f"Trovati solo {len(tutti_i_numeri)} numeri. Struttura sito variata.")
 
     except Exception as e:
         print(f"Errore: {e}")
