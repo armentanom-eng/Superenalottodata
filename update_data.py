@@ -7,11 +7,11 @@ def update_csv():
     file_path = 'storico_completo.csv'
     url = "https://www.superenalotto.net/"
     headers = {
-        'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1'
+        'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15'
     }
 
     html = ""
-    for i in range(3): # Prova 3 volte per evitare il timeout di image_51.png
+    for i in range(3):
         try:
             r = requests.get(url, headers=headers, timeout=20)
             r.encoding = 'utf-8'
@@ -22,56 +22,45 @@ def update_csv():
             time.sleep(5)
             continue
 
-    if not html:
-        print("Errore: Impossibile connettersi al sito dopo 3 tentativi.")
-        return
+    if not html: return
 
-    # 1. Estrazione DATA (Es: 12 maggio)
+    # 1. DATA (es. 12 maggio)
     data_match = re.search(r'(\d{1,2})\s+(maggio|giugno|luglio|agosto|settembre|ottobre|novembre|dicembre|gennaio|febbraio|marzo|aprile)', html, re.IGNORECASE)
-    if not data_match:
-        print("Data non trovata nel codice HTML.")
-        return
+    if not data_match: return
     
-    gg = data_match.group(1).zfill(2)
-    mese = data_match.group(2).lower()[:3]
-    data_csv = f"{gg}-{mese}"
+    data_csv = f"{data_match.group(1).zfill(2)}-{data_match.group(2).lower()[:3]}"
 
-    # 2. Estrazione NUMERI (Sestina, Jolly, Star) come da image_47.png
-    sestina = re.findall(r'<li class="ball">(\d{1,2})</li>', html)[:6]
-    jolly_match = re.search(r'ball jolly">(\d{1,2})</li>', html)
-    star_match = re.search(r'ball superstar">(\d{1,2})</li>', html)
+    # 2. NUMERI: Prendiamo TUTTE le palline in ordine
+    # Cerchiamo tutti i numeri contenuti in tag <li> che hanno "ball" nella classe
+    tutte_le_palline = re.findall(r'<li class="ball.*?">(\d{1,2})</li>', html)
 
-    if not sestina or not jolly_match or not star_match:
-        print("Numeri non trovati correttamente.")
-        return
-
-    j = jolly_match.group(1)
-    s = star_match.group(1)
-
-    # 3. COSTRUZIONE RIGA (Correzione errore image_49.png)
-    # Formato voluto: INDICE [SPAZI] DATA;N1;N2;N3;N4;N5;N6;JOLLY;STAR
-    stringa_numeri = ";".join(sestina)
-    dati_finali = f"{data_csv};{stringa_numeri};{j};{s}"
-
-    # 4. GESTIONE FILE
-    if not os.path.exists(file_path): return
-    with open(file_path, 'r', encoding='utf-8') as f:
-        righe = [line.strip() for line in f.readlines() if line.strip()]
-        ultima_riga = righe[-1]
-
-    if data_csv not in ultima_riga:
-        # Prende l'indice all'inizio (es. 4280)
-        ultimo_indice = int(ultima_riga.split()[0])
-        nuovo_indice = ultimo_indice + 1
+    if len(tutte_le_palline) >= 8:
+        sestina = tutte_le_palline[:6]
+        jolly = tutte_le_palline[6]  # La 7ª pallina è il Jolly (5)
+        star = tutte_le_palline[7]   # L'8ª pallina è la Star (2)
         
-        # Scrive esattamente come le tue righe precedenti
-        riga_da_scrivere = f"{nuovo_indice}   {dati_finali}"
-        
-        with open(file_path, 'a', encoding='utf-8') as f:
-            f.write('\n' + riga_da_scrivere)
-        print(f"✅ RIGA AGGIUNTA CORRETTAMENTE: {riga_da_scrivere}")
+        corpo_dati = f"{data_csv};{';'.join(sestina)};{jolly};{star}"
+
+        # 3. GESTIONE FILE
+        if not os.path.exists(file_path): return
+        with open(file_path, 'r', encoding='utf-8') as f:
+            righe = [line.strip() for line in f.readlines() if line.strip()]
+            ultima_riga = righe[-1]
+
+        if data_csv not in ultima_riga:
+            ultimo_indice = int(ultima_riga.split()[0])
+            nuovo_indice = ultimo_indice + 1
+            
+            # Formato finale identico a riga 4280 (image_49.png)
+            riga_finale = f"{nuovo_indice}   {corpo_dati}"
+            
+            with open(file_path, 'a', encoding='utf-8') as f:
+                f.write('\n' + riga_finale)
+            print(f"✅ AGGIORNATO: {riga_finale}")
+        else:
+            print(f"Data {data_csv} già presente.")
     else:
-        print(f"Estrazione del {data_csv} già presente.")
+        print(f"Trovate solo {len(tutte_le_palline)} palline. Struttura sito cambiata.")
 
 if __name__ == "__main__":
     update_csv()
