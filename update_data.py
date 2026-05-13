@@ -13,51 +13,49 @@ def update_csv():
     }
 
     try:
-        print(f"Verifica link: {url}")
         r = requests.get(url, headers=headers, timeout=20)
         r.encoding = 'utf-8'
-
-        if r.status_code != 200:
-            print(f"Errore connessione: {r.status_code}")
-            return
-
-        # 1. Pulizia testo per rendere i dati leggibili dalla Regex
+        
+        # Pulizia testo
         testo_puro = re.sub(r'<[^>]+>', ' ', r.text)
         testo_puro = ' '.join(testo_puro.split())
 
-        # 2. Regex per trovare tutte le righe (Data + 8 numeri)
+        # Cerchiamo tutte le estrazioni
         pattern = r'(\d{2}[-\s][a-zA-Z]{3})\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)'
         matches = re.findall(pattern, testo_puro)
 
         if not matches:
-            print("Nessun dato trovato nella pagina.")
+            print("ERRORE: Non trovo nessuna estrazione nella pagina!")
             return
 
-        # 3. IDENTIFICHIAMO L'ULTIMA RIGA DEL SITO (Quella che dovrebbe essere il 12-mag)
-        m = matches[-1] 
+        # STAMPA DI DEBUG: Vediamo le ultime 3 estrazioni che il bot ha trovato sul sito
+        print(f"DEBUG - Ultime estrazioni trovate sul sito:")
+        for m in matches[-3:]:
+            print(f" -> {m[0]}")
+
+        # Prendiamo l'ULTIMA assoluta
+        m = matches[-1]
         data_sito = m[0].replace(" ", "-").lower()
         riga_sito = f"{data_sito};{m[1]};{m[2]};{m[3]};{m[4]};{m[5]};{m[6]};{m[7]};{m[8]}"
-        
-        print(f"ULTIMO DATO SUL SITO: {riga_sito}")
 
-        # 4. LEGGIAMO L'ULTIMA RIGA DEL TUO FILE CSV
+        # Leggiamo l'ultima del CSV
         ultima_csv = ""
         if os.path.exists(file_path):
             with open(file_path, 'r', encoding='utf-8') as f:
                 righe = [l.strip() for l in f.readlines() if l.strip()]
-                if righe:
-                    ultima_csv = righe[-1]
+                if righe: ultima_csv = righe[-1]
 
-        # 5. IL CONFRONTO: Se l'ultima del sito è diversa dall'ultima del CSV, scriviamo
+        print(f"CONFRONTO:\nSito: {riga_sito}\nCSV : {ultima_csv}")
+
         if riga_sito != ultima_csv:
             with open(file_path, 'a', encoding='utf-8') as f:
                 f.write('\n' + riga_sito)
-            print(f"SUCCESSO: Aggiunta l'estrazione del {data_sito}!")
+            print(f"✅ AGGIORNATO: Inserito {data_sito}")
         else:
-            print(f"SISTEMA AGGIORNATO: L'estrazione del {data_sito} è già presente.")
+            print("❌ SALTATO: Il dato è già presente o lo script vede ancora il vecchio.")
 
     except Exception as e:
-        print(f"Errore durante l'esecuzione: {e}")
+        print(f"Errore: {e}")
 
 if __name__ == "__main__":
     update_csv()
