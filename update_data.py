@@ -12,48 +12,51 @@ def update_csv():
         r.encoding = 'utf-8'
         html = r.text
 
-        # 1. DATA - Cerchiamo la prima data utile che appare (quella più recente)
+        # 1. DATA
         data_match = re.search(r'(\d{1,2})\s+(maggio|giugno|luglio|agosto|settembre|ottobre|novembre|dicembre|gennaio|febbraio|marzo|aprile)', html, re.IGNORECASE)
         if not data_match: return
         data_csv = f"{data_match.group(1).zfill(2)}-{data_match.group(2).lower()[:3]}"
 
-        # 2. NUMERI - Struttura Chrome PC (image_62.png)
+        # 2. NUMERI (Classi da image_62.png)
         sestina = re.findall(r'class="ball">(\d{1,2})</li>', html)[:6]
         jolly = re.search(r'class="jolly">(\d{1,2})</li>', html)
         star = re.search(r'class="superstar">(\d{1,2})</li>', html)
 
         if len(sestina) == 6 and jolly and star:
-            n_finali = [n.zfill(2) for n in sestina]
+            # Formattazione rigorosa: tutti con lo zero davanti (zfill 2)
+            numeri_finali = [n.zfill(2) for n in sestina]
             j_val = jolly.group(1).zfill(2)
             s_val = star.group(1).zfill(2)
-            corpo_dati = f"{data_csv};{';'.join(n_finali)};{j_val};{s_val}"
+            
+            # Stringa dati senza spazi: data;n1;n2;n3;n4;n5;n6;jolly;star
+            corpo_estrazione = f"{data_csv};{';'.join(numeri_finali)};{j_val};{s_val}"
 
-            # 3. SCRITTURA E PULIZIA INDICE
+            # 3. LETTURA E SCRITTURA SENZA RIGHE VUOTE
             if not os.path.exists(file_path): return
+            
             with open(file_path, 'r', encoding='utf-8') as f:
+                # Legge solo righe che contengono testo, eliminando quelle vuote
                 righe = [l.strip() for l in f.readlines() if l.strip()]
             
-            # Troviamo l'ultimo indice valido scorrendo dal basso
+            # Trova l'ultimo indice numerico valido
             ultimo_indice = 0
-            for riga in reversed(righe):
-                parti = riga.split()
-                if parti and parti[0].isdigit():
-                    ultimo_indice = int(parti[0])
-                    break
+            if righe:
+                ultimo_indice = int(righe[-1].split(';')[0])
             
-            # Verifichiamo se la data è già nell'ultima riga
-            if data_csv not in righe[-1]:
-                nuovo_indice = ultimo_indice + 1
-                riga_finale = f"{nuovo_indice}   {corpo_dati}"
-                
-                with open(file_path, 'a', encoding='utf-8') as f:
-                    f.write('\n' + riga_finale)
-                print(f"✅ REGISTRATA: {riga_finale}")
-            else:
-                print(f"Estrazione {data_csv} già presente.")
-        
+            nuovo_indice = ultimo_indice + 1
+            # Formato finale richiesto: INDICE;DATA;N1... (senza spazi)
+            riga_finale = f"{nuovo_indice};{corpo_estrazione}"
+            
+            # Scrittura: sovrascrive il file per garantire che non ci siano righe vuote in mezzo
+            with open(file_path, 'w', encoding='utf-8') as f:
+                for riga in righe:
+                    f.write(riga + '\n')
+                f.write(riga_finale) # Scrive sempre l'ultima estrazione trovata
+            
+            print(f"✅ REGISTRATA correttamente: {riga_finale}")
+
     except Exception as e:
-        print(f"Errore tecnico: {e}")
+        print(f"Errore: {e}")
 
 if __name__ == "__main__":
     update_csv()
