@@ -12,51 +12,60 @@ def update_csv():
         r.encoding = 'utf-8'
         html = r.text
 
-        # 1. DATA
+        # 1. Trova la DATA (es. 12 maggio)
         data_match = re.search(r'(\d{1,2})\s+(maggio|giugno|luglio|agosto|settembre|ottobre|novembre|dicembre|gennaio|febbraio|marzo|aprile)', html, re.IGNORECASE)
         if not data_match: return
         data_csv = f"{data_match.group(1).zfill(2)}-{data_match.group(2).lower()[:3]}"
 
-        # 2. NUMERI (Classi da image_62.png)
+        # 2. Trova i NUMERI (Classi ball, jolly, superstar viste su PC)
         sestina = re.findall(r'class="ball">(\d{1,2})</li>', html)[:6]
         jolly = re.search(r'class="jolly">(\d{1,2})</li>', html)
         star = re.search(r'class="superstar">(\d{1,2})</li>', html)
 
         if len(sestina) == 6 and jolly and star:
-            # Formattazione rigorosa: tutti con lo zero davanti (zfill 2)
-            numeri_finali = [n.zfill(2) for n in sestina]
+            n_finali = [n.zfill(2) for n in sestina]
             j_val = jolly.group(1).zfill(2)
             s_val = star.group(1).zfill(2)
-            
-            # Stringa dati senza spazi: data;n1;n2;n3;n4;n5;n6;jolly;star
-            corpo_estrazione = f"{data_csv};{';'.join(numeri_finali)};{j_val};{s_val}"
+            # Formato: DATA;N1;N2;N3;N4;N5;N6;JOLLY;STAR
+            corpo_estrazione = f"{data_csv};{';'.join(n_finali)};{j_val};{s_val}"
 
-            # 3. LETTURA E SCRITTURA SENZA RIGHE VUOTE
+            # 3. GESTIONE CSV E PULIZIA ERRORI
             if not os.path.exists(file_path): return
             
             with open(file_path, 'r', encoding='utf-8') as f:
-                # Legge solo righe che contengono testo, eliminando quelle vuote
-                righe = [l.strip() for l in f.readlines() if l.strip()]
+                righe_grezze = f.readlines()
             
-            # Trova l'ultimo indice numerico valido
+            # Filtriamo solo le righe che iniziano con un numero valido (evitiamo il crash di image_65.png)
+            righe_valide = []
             ultimo_indice = 0
-            if righe:
-                ultimo_indice = int(righe[-1].split(';')[0])
             
+            for riga in righe_grezze:
+                riga = riga.strip()
+                if not riga: continue
+                
+                # Prova a estrarre l'indice iniziale
+                parti = riga.split(';')
+                if parti[0].isdigit():
+                    ultimo_indice = int(parti[0])
+                    righe_valide.append(riga)
+                else:
+                    # Se la riga è "sporca" (es. inizia con 09-mag), la ignoriamo e non la salviamo
+                    continue
+            
+            # Prepariamo la nuova riga
             nuovo_indice = ultimo_indice + 1
-            # Formato finale richiesto: INDICE;DATA;N1... (senza spazi)
             riga_finale = f"{nuovo_indice};{corpo_estrazione}"
             
-            # Scrittura: sovrascrive il file per garantire che non ci siano righe vuote in mezzo
+            # Scrittura finale: rigenera il file pulito + la nuova estrazione
             with open(file_path, 'w', encoding='utf-8') as f:
-                for riga in righe:
+                for riga in righe_valide:
                     f.write(riga + '\n')
-                f.write(riga_finale) # Scrive sempre l'ultima estrazione trovata
+                f.write(riga_finale)
             
-            print(f"✅ REGISTRATA correttamente: {riga_finale}")
-
+            print(f"✅ FILE RIPULITO E AGGIORNATO: {riga_finale}")
+        
     except Exception as e:
-        print(f"Errore: {e}")
+        print(f"Errore tecnico: {e}")
 
 if __name__ == "__main__":
     update_csv()
