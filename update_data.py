@@ -14,57 +14,50 @@ def update_csv():
 
         # 1. Estrazione DATA
         data_match = re.search(r'(\d{1,2})\s+(maggio|giugno|luglio|agosto|settembre|ottobre|novembre|dicembre|gennaio|febbraio|marzo|aprile)', html, re.IGNORECASE)
-        if not data_match:
-            print("Nessuna data trovata sul sito.")
-            return
-        
+        if not data_match: return
         data_csv = f"{data_match.group(1).zfill(2)}-{data_match.group(2).lower()[:3]}"
 
-        # 2. Estrazione NUMERI (Struttura verificata da image_62.png)
+        # 2. Estrazione NUMERI
         sestina = re.findall(r'class="ball">(\d{1,2})</li>', html)[:6]
         jolly = re.search(r'class="jolly">(\d{1,2})</li>', html)
         star = re.search(r'class="superstar">(\d{1,2})</li>', html)
 
-        # CONTROLLO CRITICO: Se mancano i numeri (sito non aggiornato), NON SCRIVERE NULLA
         if not (len(sestina) == 6 and jolly and star):
-            print("Numeri non ancora disponibili sul sito. Operazione annullata per evitare errori.")
+            print("Dati incompleti sul sito. Salto.")
             return
 
-        # Preparazione stringa dati
-        n_finali = [n.zfill(2) for n in sestina]
-        j_val = jolly.group(1).zfill(2)
-        s_val = star.group(1).zfill(2)
-        corpo_estrazione = f"{data_csv};{';'.join(n_finali)};{j_val};{s_val}"
-
-        # 3. Lettura dell'ultimo indice (SENZA riscrittura del file)
-        if not os.path.exists(file_path):
-            print(f"Errore: {file_path} non trovato.")
-            return
-
+        # 3. Calcolo INDICE (Migliorato per gestire image_68.png)
         with open(file_path, 'r', encoding='utf-8') as f:
             linee = [l.strip() for l in f.readlines() if l.strip()]
         
         ultimo_indice = 0
-        if linee:
-            # Cerchiamo l'ultimo indice valido scorrendo dal basso
-            for riga in reversed(linee):
-                parti = riga.split(';')
-                if parti[0].isdigit():
-                    ultimo_indice = int(parti[0])
-                    break
+        for riga in reversed(linee):
+            # Cerchiamo il primo numero all'inizio della riga
+            match_idx = re.match(r'^(\d+)', riga)
+            if match_idx:
+                ultimo_indice = int(match_idx.group(1))
+                break
         
-        # 4. AGGIUNTA (APPEND) - Forza l'aggiunta indipendentemente dalla data
+        # 4. Formattazione riga (Niente spazi, formato preciso)
         nuovo_indice = ultimo_indice + 1
-        riga_da_scrivere = f"{nuovo_indice};{corpo_estrazione}"
+        n_lista = [n.zfill(2) for n in sestina]
+        # Forza il formato: INDICE;DATA;NUMERI;JOLLY;STAR
+        riga_finale = f"{nuovo_indice};{data_csv};{';'.join(n_lista)};{jolly.group(1).zfill(2)};{star.group(1).zfill(2)}"
+
+        # 5. Scrittura pulita (Evita riga vuota se non necessaria)
+        with open(file_path, 'r', encoding='utf-8') as f:
+            contenuto = f.read()
+        
+        # Se il file non finisce già con un a capo, lo aggiungiamo noi
+        separatore = "" if contenuto.endswith('\n') else "\n"
         
         with open(file_path, 'a', encoding='utf-8') as f:
-            # Assicuriamoci di andare a capo prima di scrivere la nuova riga
-            f.write('\n' + riga_da_scrivere)
+            f.write(separatore + riga_finale)
             
-        print(f"✅ Estrazione aggiunta con successo: {riga_finale}")
+        print(f"Inserito correttamente: {riga_finale}")
 
     except Exception as e:
-        print(f"Errore durante l'esecuzione: {e}")
+        print(f"Errore: {e}")
 
 if __name__ == "__main__":
     update_csv()
