@@ -12,7 +12,7 @@ def update_csv():
         r.encoding = 'utf-8'
         html = r.text
 
-        # 1. Recupero dati dal sito
+        # Estrazione dati (struttura verificata da image_62.png)
         data_match = re.search(r'(\d{1,2})\s+(maggio|giugno|luglio|agosto|settembre|ottobre|novembre|dicembre|gennaio|febbraio|marzo|aprile)', html, re.IGNORECASE)
         if not data_match: return
         data_csv = f"{data_match.group(1).zfill(2)}-{data_match.group(2).lower()[:3]}"
@@ -22,30 +22,28 @@ def update_csv():
         star = re.search(r'class="superstar">(\d{1,2})</li>', html)
 
         if len(sestina) == 6 and jolly and star:
-            # Prepariamo la riga
+            # Prepariamo la riga in formato INDICE;DATA;N1;N2;N3;N4;N5;N6;JOLLY;STAR
             n_finali = [n.zfill(2) for n in sestina]
-            corpo = f"{data_csv};{';'.join(n_finali)};{jolly.group(1).zfill(2)};{star.group(1).zfill(2)}"
-
-            # 2. Leggiamo SOLO l'ultima riga per l'indice (senza toccare il resto)
+            j_val = jolly.group(1).zfill(2)
+            s_val = star.group(1).zfill(2)
+            
+            # Leggiamo SOLO l'ultima riga per calcolare il nuovo numero
             with open(file_path, 'r', encoding='utf-8') as f:
                 righe = [l.strip() for l in f.readlines() if l.strip()]
             
-            # Cerchiamo l'ultimo indice buono
-            ultimo_indice = 0
-            for riga in reversed(righe):
-                parti = riga.split(';')
-                if parti[0].isdigit():
-                    ultimo_indice = int(parti[0])
-                    break
+            ultima_riga = righe[-1] if righe else "0;00-xxx;00;00;00;00;00;00;00;00"
             
-            # 3. SCRITTURA IN APPEND (Aggiunge solo alla fine)
-            if data_csv not in righe[-1]:
-                nuovo_indice = ultimo_indice + 1
-                riga_da_aggiungere = f"{nuovo_indice};{corpo}"
+            # Se l'estrazione non è già presente
+            if data_csv not in ultima_riga:
+                ultimo_indice = int(ultima_riga.split(';')[0])
+                nuova_riga = f"{ultimo_indice + 1};{data_csv};{';'.join(n_finali)};{j_val};{s_val}"
                 
+                # 'a' significa APPEND: aggiunge solo alla fine, IMPOSSIBILE cancellare il sopra
                 with open(file_path, 'a', encoding='utf-8') as f:
-                    f.write('\n' + riga_da_aggiungere)
-                print(f"Aggiunta riga: {riga_da_aggiungere}")
+                    f.write('\n' + nuova_riga)
+                print(f"Aggiunta riuscita: {nuova_riga}")
+            else:
+                print("Dati già aggiornati.")
 
     except Exception as e:
         print(f"Errore: {e}")
