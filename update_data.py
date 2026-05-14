@@ -12,41 +12,59 @@ def update_csv():
         r.encoding = 'utf-8'
         html = r.text
 
-        # Estrazione dati (struttura verificata da image_62.png)
+        # 1. Estrazione DATA
         data_match = re.search(r'(\d{1,2})\s+(maggio|giugno|luglio|agosto|settembre|ottobre|novembre|dicembre|gennaio|febbraio|marzo|aprile)', html, re.IGNORECASE)
-        if not data_match: return
+        if not data_match:
+            print("Nessuna data trovata sul sito.")
+            return
+        
         data_csv = f"{data_match.group(1).zfill(2)}-{data_match.group(2).lower()[:3]}"
 
+        # 2. Estrazione NUMERI (Struttura verificata da image_62.png)
         sestina = re.findall(r'class="ball">(\d{1,2})</li>', html)[:6]
         jolly = re.search(r'class="jolly">(\d{1,2})</li>', html)
         star = re.search(r'class="superstar">(\d{1,2})</li>', html)
 
-        if len(sestina) == 6 and jolly and star:
-            # Prepariamo la riga in formato INDICE;DATA;N1;N2;N3;N4;N5;N6;JOLLY;STAR
-            n_finali = [n.zfill(2) for n in sestina]
-            j_val = jolly.group(1).zfill(2)
-            s_val = star.group(1).zfill(2)
+        # CONTROLLO CRITICO: Se mancano i numeri (sito non aggiornato), NON SCRIVERE NULLA
+        if not (len(sestina) == 6 and jolly and star):
+            print("Numeri non ancora disponibili sul sito. Operazione annullata per evitare errori.")
+            return
+
+        # Preparazione stringa dati
+        n_finali = [n.zfill(2) for n in sestina]
+        j_val = jolly.group(1).zfill(2)
+        s_val = star.group(1).zfill(2)
+        corpo_estrazione = f"{data_csv};{';'.join(n_finali)};{j_val};{s_val}"
+
+        # 3. Lettura dell'ultimo indice (SENZA riscrittura del file)
+        if not os.path.exists(file_path):
+            print(f"Errore: {file_path} non trovato.")
+            return
+
+        with open(file_path, 'r', encoding='utf-8') as f:
+            linee = [l.strip() for l in f.readlines() if l.strip()]
+        
+        ultimo_indice = 0
+        if linee:
+            # Cerchiamo l'ultimo indice valido scorrendo dal basso
+            for riga in reversed(linee):
+                parti = riga.split(';')
+                if parti[0].isdigit():
+                    ultimo_indice = int(parti[0])
+                    break
+        
+        # 4. AGGIUNTA (APPEND) - Forza l'aggiunta indipendentemente dalla data
+        nuovo_indice = ultimo_indice + 1
+        riga_da_scrivere = f"{nuovo_indice};{corpo_estrazione}"
+        
+        with open(file_path, 'a', encoding='utf-8') as f:
+            # Assicuriamoci di andare a capo prima di scrivere la nuova riga
+            f.write('\n' + riga_da_scrivere)
             
-            # Leggiamo SOLO l'ultima riga per calcolare il nuovo numero
-            with open(file_path, 'r', encoding='utf-8') as f:
-                righe = [l.strip() for l in f.readlines() if l.strip()]
-            
-            ultima_riga = righe[-1] if righe else "0;00-xxx;00;00;00;00;00;00;00;00"
-            
-            # Se l'estrazione non è già presente
-            if data_csv not in ultima_riga:
-                ultimo_indice = int(ultima_riga.split(';')[0])
-                nuova_riga = f"{ultimo_indice + 1};{data_csv};{';'.join(n_finali)};{j_val};{s_val}"
-                
-                # 'a' significa APPEND: aggiunge solo alla fine, IMPOSSIBILE cancellare il sopra
-                with open(file_path, 'a', encoding='utf-8') as f:
-                    f.write('\n' + nuova_riga)
-                print(f"Aggiunta riuscita: {nuova_riga}")
-            else:
-                print("Dati già aggiornati.")
+        print(f"✅ Estrazione aggiunta con successo: {riga_finale}")
 
     except Exception as e:
-        print(f"Errore: {e}")
+        print(f"Errore durante l'esecuzione: {e}")
 
 if __name__ == "__main__":
     update_csv()
